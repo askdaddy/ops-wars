@@ -7,12 +7,12 @@
 - IDC
   - 192.168.0.0/16
   - Gateway: 192.168.0.1 / 外网ip保密
-  - Tinc: 192.168.107.102
+  - VPN-Peer: 192.168.107.102
 
 - Tcloud
   - 10.10.0.0/16 (VPS)
   - Gateway: 10.10.0.1
-  - Tinc: 10.10.10.2 / 外网ip保密，下文使用 <tcloud-tip> 代表
+  - VPN-Peer: 10.10.10.2 / 外网ip保密，下文使用 <tcloud-tip> 代表
 
 > 以上tinc服务器环境为 Ubuntu18.04.5
 
@@ -25,7 +25,7 @@ $ sudo apt install -y tinc
 $ sudo mkdir -p /etc/tinc/apowo/hosts
 ```
 
-### @IDC.Tinc 配置
+### @IDC.VPN-Peer 配置
 
 *File: /etc/tinc/apowo/tinc.conf*
 ```conf
@@ -68,7 +68,7 @@ u0s2nigSkVOzUd0N4NiHlOPZHoWcFm4rkSs3h0R6D0P8xA2Xx2mkKBkCAwEAAQ==
 ```
 
 
-### @Tcloud.Tinc 配置
+### @Tcloud.VPN-Peer 配置
 *File: /etc/tinc/apowo/tinc.conf*
 ```conf
 Name=tcloud  
@@ -125,7 +125,7 @@ nVCTUXX72FlQVUaS894NPJ3OueOdeskoMb8/eSyLEaPOddSpaweQBk0CAwEAAQ==
 $ sudo apt install -y bird
 ```
 
-### @IDC.Bird 配置
+### @IDC.VPN-Peer 配置
 *File: /etc/bird/bird.conf*
 ```conf
 router id 10.28.0.253;
@@ -165,7 +165,7 @@ protocol ospf {
 
 
 
-### @Tcloud.Bird 配置
+### @Tcloud.VPN-Peer 配置
 *File: /etc/bird/bird.conf*
 ```conf
 router id 10.28.0.254;
@@ -227,4 +227,37 @@ default via 10.10.10.1 dev eth0 proto dhcp src 10.10.10.2 metric 100
 192.168.0.0/16 via 10.28.0.253 dev tinc0 proto bird metric 64
 ```
 
+
+## 配置NAT
+```bash
+# enable ip forward
+$ sudo echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
+$ sudo sysctl -p
+```
+
+### @IDC.VPN-Peer
+```bash
+$ iptables -t nat -I POSTROUTING -d 192.168.0.0/16 -j SNAT --to 192.168.107.102
+```
+
+### @Tcloud.VPN-Peer
+```bash
+$ iptables -t nat -I POSTROUTING -d 10.10.0.0/16 -j SNAT --to 10.10.10.2
+```
+
+## 配置核心路由
+
+### @IDC.Nat-Gateway
+```bash
+# 将10.10.0.0/16网段下一跳指向 VPN-Peer
+$ sudo ip r add 10.10.0.0/16 via 192.168.107.102
+```
+
+### @Tcloud
+腾讯云默认提供了VPC，需要设置VPC的默认路由策略，如下图，添加一条
+![VPC 默认路由表](Lark20210731-113203.png)
+
+
+## 完成
+全部配置成功后@IDC和@Tcloud的内网就可以互联互通了。
 
